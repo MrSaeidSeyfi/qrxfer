@@ -34,3 +34,4 @@ class FileCompressor:
         logger.info(f"Compressed to {len(compressed):,} bytes, ratio: {compression_ratio:.2f}%")
         return compressed
 
+
