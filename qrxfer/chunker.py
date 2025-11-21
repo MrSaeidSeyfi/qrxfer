@@ -6,10 +6,11 @@ logger = logging.getLogger(__name__)
 
 
 class DataChunker:
-    def __init__(self, max_qr_capacity=2953, header_size=12):
+    def __init__(self, max_qr_capacity=1260, header_size=8, checksum_size=4):
         self.max_qr_capacity = max_qr_capacity
         self.header_size = header_size
-        self.chunk_size = max_qr_capacity - header_size
+        self.checksum_size = checksum_size
+        self.chunk_size = max_qr_capacity - header_size - checksum_size
     
     def calculate_chunks(self, data_size):
         num_chunks = (data_size + self.chunk_size - 1) // self.chunk_size
@@ -34,5 +35,6 @@ class DataChunker:
             raise ValueError("Chunk exceeds maximum QR capacity")
         
         return full_chunk
+
 
 

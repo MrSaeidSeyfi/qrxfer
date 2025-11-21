@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Scan QR codes with green borders to transfer files">
+    <meta name="theme-color" content="#00ff00">
+    <title>QR Transfer Scanner</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>QR Transfer Scanner</h1>
+            <p class="subtitle">Scan QR codes with green borders from video</p>
+        </header>
+
+        <div class="scanner-section">
+            <div class="video-container">
+                <video id="video" autoplay playsinline></video>
+                <canvas id="canvas" style="display: none;"></canvas>
+                <div class="overlay">
+                    <div class="scan-frame"></div>
+                </div>
+            </div>
+            
+            <div class="controls">
+                <button id="startBtn" class="btn btn-primary">Start Camera</button>
+                <button id="stopBtn" class="btn btn-secondary" disabled>Stop Camera</button>
+            </div>
+        </div>
+
+        <div class="status-section">
+            <div class="status-card">
+                <h3>Scan Status</h3>
+                <div id="statusText" class="status-text">Ready to scan</div>
+                <div class="progress-info">
+                    <div>Chunks scanned: <span id="chunksScanned">0</span></div>
+                    <div>Total chunks: <span id="totalChunks">-</span></div>
+                    <div class="progress-bar">
+                        <div id="progressFill" class="progress-fill"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chunks-list">
+                <h3>Detected Chunks</h3>
+                <div id="chunksList" class="chunks-container"></div>
+            </div>
+        </div>
+
+        <div class="result-section" id="resultSection" style="display: none;">
+            <h3>File Reconstructed!</h3>
+            <div id="fileInfo" class="file-info"></div>
+            <button id="downloadBtn" class="btn btn-success">Download File</button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="scanner.js"></script>
+    
+    <script>
+        // Register service worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('service-worker.js')
+                    .then(reg => console.log('Service Worker registered'))
+                    .catch(err => console.log('Service Worker registration failed'));
+            });
+        }
+    </script>
+</body>
+</html>
+

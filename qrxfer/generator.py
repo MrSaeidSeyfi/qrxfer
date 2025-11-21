@@ -1,5 +1,8 @@
 import os
 import logging
+from multiprocessing import Pool
+import numpy as np
+from PIL import Image, ImageDraw, ImageFont
 from .compressor import FileCompressor
 from .chunker import DataChunker
 from .qr_generator import QRCodeGenerator
@@ -8,13 +11,21 @@ from .video_writer import VideoWriter
 logger = logging.getLogger(__name__)
 
 
+def _generate_qr_worker(args):
+    chunk_data, chunk_index, total_chunks, qr_version, qr_size = args
+    qr_gen = QRCodeGenerator(version=qr_version, qr_size=qr_size)
+    qr_image = qr_gen.generate_qr_code(chunk_data)
+    logger.info(f"Generated QR code {chunk_index+1}/{total_chunks}")
+    return chunk_index, qr_image
+
 class QRVideoGenerator:
-    def __init__(self, qr_version=40, qr_size=400, fps=25):
+    def __init__(self, qr_version=40, qr_size=400, fps=25, num_processes=4):
         self.compressor = FileCompressor()
         self.chunker = DataChunker()
         self.qr_generator = QRCodeGenerator(version=qr_version, qr_size=qr_size)
         self.fps = fps
         self.qr_size = qr_size
+        self.num_processes = num_processes
     
     def generate(self, input_file, output_video):
         logger.info(f"Starting QR video generation: {input_file}")
@@ -33,17 +44,32 @@ class QRVideoGenerator:
             
             num_chunks = self.chunker.calculate_chunks(len(compressed_data))
             
-            qr_images = []
+            chunks_data = []
             for i in range(num_chunks):
                 chunk = self.chunker.create_chunk(compressed_data, i, num_chunks)
-                qr_image = self.qr_generator.generate_qr_code(chunk)
-                qr_images.append(qr_image)
+                chunks_data.append((chunk, i, num_chunks, self.qr_generator.version, self.qr_size))
+            
+            logger.info(f"Generating {num_chunks} QR codes using {self.num_processes} processes")
+            
+            qr_images = [None] * num_chunks
+            with Pool(processes=self.num_processes) as pool:
+                results = pool.map(_generate_qr_worker, chunks_data)
+                for chunk_index, qr_image in results:
+                    qr_images[chunk_index] = qr_image
             
             logger.info(f"Generated {len(qr_images)} QR codes")
             
             frame_size = (self.qr_size + 20, self.qr_size + 20)
             video_writer = VideoWriter(output_video, fps=self.fps, frame_size=frame_size)
             video_writer.open()
+            
+            countdown_frames = int(self.fps * 3)
+            logger.info(f"Adding {countdown_frames} countdown frames (3 seconds)")
+            
+            for i in range(countdown_frames):
+                countdown_value = 3 - ((i + 1) / self.fps)
+                countdown_frame = self._create_countdown_frame(frame_size, countdown_value)
+                video_writer.write_frame(countdown_frame)
             
             for idx, img in enumerate(qr_images):
                 video_writer.write_frame(img)
@@ -62,6 +88,37 @@ class QRVideoGenerator:
             if os.path.exists(zip_file):
                 os.remove(zip_file)
                 logger.info("Cleaned up temporary ZIP file")
+    
+    def _create_countdown_frame(self, frame_size, countdown_value):
+        img = Image.new('RGB', frame_size, (0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        
+        try:
+            font = ImageFont.truetype("arial.ttf", 120)
+        except:
+            try:
+                font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 120)
+            except:
+                font = ImageFont.load_default()
+        
+        if countdown_value >= 2:
+            text = "3"
+        elif countdown_value >= 1:
+            text = "2"
+        elif countdown_value > 0:
+            text = "1"
+        else:
+            text = "GO"
+        bbox = draw.textbbox((0, 0), text, font=font)
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+        
+        x = (frame_size[0] - text_width) // 2
+        y = (frame_size[1] - text_height) // 2
+        
+        draw.text((x, y), text, fill=(255, 255, 255), font=font)
+        
+        return np.array(img)
     
     def _log_summary(self, input_file, compressed_size, num_qrs, output_video):
         input_size = os.path.getsize(input_file)
